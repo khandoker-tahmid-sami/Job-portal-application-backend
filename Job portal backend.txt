@@ -1,1 +1,1576 @@
-Job Portal Backend Project
+Job Portal Backend Project:
+
+Job Portal Application Backend — Full Overview
+Language & Runtime
+Language: JavaScript (Node.js)
+Runtime: Node.js
+Entry Point: server.js
+Framework & Key Libraries
+Package	Version	Purpose
+Express.js	5.2.1	Web framework (routing, middleware)
+Sequelize	6.37.7	ORM for database interaction
+jsonwebtoken	9.0.3	JWT authentication
+bcryptjs	—	Password hashing
+Multer	2.0.2	File uploads (resume, images)
+CORS	2.8.5	Cross-origin request handling
+Morgan	1.10.1	HTTP request logging
+Nodemon	3.1.11	Dev hot-reload
+Database
+Type: SQLite (file-based, no server needed)
+File: database.sqlite (139KB, pre-seeded)
+ORM: Sequelize (handles migrations, queries, associations)
+Config: config/database.js
+Pre-seeded with: 24 test users + 31 test companies (password: SecurePass123!)
+Project Structure
+
+Job portal application backend/
+├── config/
+│   └── database.js           ← Sequelize + SQLite setup
+├── controllers/
+│   ├── authController.js     ← Register, Login, Me
+│   ├── jobController.js      ← Job CRUD, search, recommendations
+│   ├── userController.js     ← Profile, resume/picture upload
+│   ├── companyController.js  ← Company profile, dashboard, applicants
+│   ├── applicationController.js ← Apply, track, status updates
+│   └── utilController.js    ← Skills & locations helpers
+├── middleware/
+│   ├── auth.js               ← JWT verify + role-based guard
+│   ├── upload.js             ← Resume upload (PDF/DOC/DOCX, 5MB)
+│   └── imageUpload.js        ← Profile/logo upload (JPEG/PNG/etc, 5MB)
+├── models/
+│   ├── index.js              ← Model associations
+│   ├── User.js               ← Job seeker schema
+│   ├── Company.js            ← Employer schema
+│   ├── Job.js                ← Job posting schema
+│   └── Application.js        ← Application schema
+├── routes/                   ← One file per resource
+├── uploads/                  ← Stored files (resumes, images, logos)
+├── .env                      ← Environment config
+└── server.js                 ← App entry point (port 5000)
+Data Models & Relationships
+User — job seekers with profile fields (skills, experience, education as JSON), resume URL, profile picture
+
+Company — employers with logo, social links, industry, employee count
+
+Job — posted by a company, has type (Full-time/Part-time/Contract/Freelance/Internship), work mode (Remote/On-site/Hybrid), salary range, skills required, experience level
+
+Application — links User → Job, tracks status through lifecycle: New → Shortlisted → Interviewed → Rejected/Hired
+
+Relationships:
+
+
+Company  ──hasMany──▶  Job
+Job      ──hasMany──▶  Application
+User     ──hasMany──▶  Application
+Authentication
+Method: JWT (Bearer token in Authorization header)
+Expiry: 30 days
+Roles: USER (job seeker) and COMPANY (employer) — completely separate role system
+Password: bcrypt hashed
+API Endpoints Summary
+Group	Prefix	Notes
+Auth	/api/auth	register, login, me
+Jobs	/api/jobs	CRUD, search, filters, recommendations
+Users	/api/users	profile, resume/picture upload
+Companies	/api/companies	profile, dashboard stats, applicants
+Applications	/api/applications	apply, withdraw, status change
+Utilities	/api/utils	skills list, locations list
+Key Features
+Dual-role system — job seekers and employers have separate auth flows
+Job search — full-text search + filters (type, experience, skills, salary range)
+Job recommendations — matches jobs to user's skills and experience level
+Application pipeline — full status tracking from New to Hired
+File uploads — resumes (PDF/DOC) and profile pictures/logos stored locally
+Company dashboard — stats on total jobs, active listings, applicant counts, shortlists
+Public profiles — public pages for companies and users
+In short: This is a RESTful Node.js + Express backend using SQLite (via Sequelize ORM), JWT authentication with two user roles, and full job portal functionality covering job listings, applications, and file uploads.
+
+
+
+
+
+From Codex: 
+
+I read through the project. This is a Job Portal backend API. It is backend-only, no frontend app is included.
+
+Tech Stack
+
+
+Language: JavaScript, using CommonJS require(...)
+
+Runtime: Node.js
+
+Backend framework: Express.js 5.2.1
+
+Database: SQLite, stored in database.sqlite
+
+ORM: Sequelize
+
+Authentication: JWT using jsonwebtoken
+
+Password hashing: bcryptjs
+
+File upload: multer
+
+Logging: morgan
+
+CORS: cors
+
+Environment config: .env via dotenv
+
+
+Main Entry Point
+
+The app starts from server.js.
+
+It does these things:
+
+
+loads environment variables
+
+creates an Express app
+
+enables CORS, JSON body parsing, URL-encoded parsing, and logging
+
+serves /uploads as a static folder
+
+registers API routes
+
+connects to SQLite through Sequelize
+
+runs sequelize.sync({ force: false })
+
+starts the server
+
+
+Current port setup:
+
+
+.env sets PORT=5000
+
+server.js also defaults to 5000
+
+README says the project should run on 9000, so there is a mismatch.
+
+
+To run it:
+
+bash
+
+
+
+npm install
+npm run dev
+
+
+
+Then API base URL should be:
+
+text
+
+
+
+http://localhost:5000
+
+
+
+Database
+
+Database config is in config/database.js.
+
+It uses SQLite:
+
+js
+
+
+
+dialect: 'sqlite'
+storage: process.env.DB_STORAGE || './database.sqlite'
+
+
+
+Actual database contents I found:
+
+
+Users: 24 records
+
+Companies: 30 records
+
+Jobs: 30 records
+
+Applications: 50 records
+
+
+Project Structure
+
+
+models contains Sequelize models.
+
+routes defines API endpoints.
+
+controllers contains business logic.
+
+middleware handles auth and uploads.
+
+uploads stores uploaded files.
+
+
+Main Models
+
+There are four main database models:
+
+
+User: job seeker profile, email/password, resume, skills, experience, education, profile picture.
+
+Company: employer profile, slug, email/password, logo, industry, website, social links.
+
+Job: posted job with title, slug, companyId, type, work mode, salary, category, skills, deadline, status.
+
+Application: connects a user to a job, with cover letter, resume snapshot, and status.
+
+
+Relationships are defined in models/index.js:
+
+
+One company has many jobs.
+
+One user has many applications.
+
+One job has many applications.
+
+
+Authentication
+
+Auth logic is in controllers/authController.js and middleware/auth.js.
+
+The system supports two roles:
+
+
+USER
+
+COMPANY
+
+
+Login/register returns a JWT token. Protected routes expect:
+
+text
+
+
+
+Authorization: Bearer <token>
+
+
+
+Passwords are hashed with bcrypt before saving.
+
+API Areas
+
+Auth routes:
+
+
+POST /api/auth/register
+
+POST /api/auth/login
+
+GET /api/auth/me
+
+
+Job routes:
+
+
+GET /api/jobs
+
+POST /api/jobs
+
+PUT /api/jobs/:id
+
+DELETE /api/jobs/:id
+
+GET /api/jobs/recommendations
+
+GET /api/jobs/:id/similar
+
+GET /api/jobs/:slug
+
+
+User routes:
+
+
+GET /api/users/profile
+
+PUT /api/users/profile
+
+POST /api/users/resume
+
+POST /api/users/profile-picture
+
+GET /api/users/:id
+
+
+Company routes:
+
+
+GET /api/companies/profile
+
+PUT /api/companies/profile
+
+POST /api/companies/logo
+
+GET /api/companies/jobs
+
+GET /api/companies/applicants
+
+GET /api/companies/dashboard/stats
+
+GET /api/companies/:slug/jobs
+
+GET /api/companies/:slug
+
+
+Application routes:
+
+
+POST /api/applications/jobs/:jobId/apply
+
+GET /api/applications/my-applications
+
+GET /api/applications/jobs/:jobId/applicants
+
+PATCH /api/applications/:id/status
+
+DELETE /api/applications/:id
+
+
+Utility routes:
+
+
+GET /api/utils/skills
+
+GET /api/utils/locations
+
+
+Important Notes
+
+A few things to be aware of:
+
+
+.env is committed and contains a JWT secret. In real production, that should not be committed.
+
+README says port 9000, but code uses 5000.
+
+package.json says "main": "index.js", but there is no index.js; the real entry file is server.js.
+
+uploads/profiles and uploads/logos folders are not present, so profile picture/logo uploads may fail unless those folders are created.
+
+There is no test script in package.json.
+
+CORS allows origin: "*", which is fine for development but too open for production.
+
+
+Overall: this is a Node.js + Express + Sequelize + SQLite REST API for a job portal where users apply to jobs and companies post/manage jobs and applicants.
+
+
+
+*******************SQLite  Database*************************
+
+Download SQLLite viewer extension to view the database. 
+
+
+
+
+***********************Database changed to mongodb***************************************
+
+Step 1 — Set up MongoDB Atlas Free Cluster
+Go to mongodb.com/atlas → Sign up / Login
+Create a Free Cluster (M0)
+Create a Database User (username + password — save these)
+Under Network Access → Add IP Address → click "Allow Access from Anywhere" (0.0.0.0/0)
+Click "Connect" → "Drivers" → Copy your connection string. It looks like:
+
+mongodb+srv://youruser:yourpassword@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority
+Replace <password> with your actual password and add your DB name:
+
+mongodb+srv://youruser:yourpassword@cluster0.xxxxx.mongodb.net/jobportal?retryWrites=true&w=majority
+
+
+Step 2 — Install Mongoose, Remove Sequelize
+Run this in your terminal inside the project folder:
+
+
+npm uninstall sequelize sqlite3
+npm install mongoose
+Step 3 — Update .env
+Replace your entire .env file with:
+
+
+PORT=5000
+JWT_SECRET=b9ab1472515ca53a78ee5aa07b93b66baad5f387922da0dddc060ff69d3ca166386c549966c9a26fb88147e8eabf6628b4bdbbbe73033e919f20a4267f05a98a
+MONGODB_URI=mongodb+srv://youruser:yourpassword@cluster0.xxxxx.mongodb.net/jobportal?retryWrites=true&w=majority
+NODE_ENV=development
+
+
+Step 4 — Rewrite config/database.js
+Replace the entire file:
+
+
+const mongoose = require('mongoose');
+
+const connectDB = async () => {
+    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
+};
+
+module.exports = connectDB;
+Step 5 — Rewrite models/User.js
+
+const mongoose = require('mongoose');
+
+const userSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    role: { type: String, default: 'USER' },
+    title: String,
+    bio: String,
+    city: String,
+    state: String,
+    country: String,
+    zipCode: String,
+    location: String,
+    phone: String,
+    portfolioUrl: String,
+    linkedinUrl: String,
+    githubUrl: String,
+    resumeUrl: String,
+    resumeOriginalName: String,
+    resumeSize: String,
+    resumeUploadDate: Date,
+    profilePictureUrl: String,
+    experienceLevel: { type: String, enum: ['Entry', 'Mid', 'Senior', 'Expert', 'Lead'] },
+    skills: { type: [String], default: [] },
+    experience: { type: Array, default: [] },
+    education: { type: Array, default: [] }
+}, { timestamps: true });
+
+module.exports = mongoose.model('User', userSchema);
+Step 6 — Rewrite models/Company.js
+
+const mongoose = require('mongoose');
+
+const companySchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    role: { type: String, default: 'COMPANY' },
+    industry: String,
+    description: String,
+    location: String,
+    city: String,
+    state: String,
+    country: String,
+    phone: String,
+    socialLinks: { type: Object, default: {} },
+    websiteUrl: String,
+    hrEmail: String,
+    infoEmail: String,
+    logoUrl: String,
+    employeeCount: String,
+    foundedYear: Number
+}, { timestamps: true });
+
+module.exports = mongoose.model('Company', companySchema);
+Step 7 — Rewrite models/Job.js
+
+const mongoose = require('mongoose');
+
+const jobSchema = new mongoose.Schema({
+    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
+    title: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    type: { type: String, enum: ['Full-time', 'Part-time', 'Contract', 'Freelance', 'Internship'], required: true },
+    workMode: { type: String, enum: ['Remote', 'On-site', 'Hybrid'], required: true },
+    location: { type: String, required: true },
+    salaryMin: Number,
+    salaryMax: Number,
+    salaryPeriod: { type: String, enum: ['Hourly', 'Daily', 'Weekly', 'Monthly', 'Yearly'] },
+    description: { type: String, required: true },
+    category: { type: String, enum: ['Engineering', 'Design', 'Product', 'Marketing', 'Sales', 'HR', 'Finance', 'Other'] },
+    experienceLevel: { type: String, enum: ['Entry', 'Mid', 'Senior', 'Expert', 'Lead'] },
+    requirements: String,
+    benefits: String,
+    deadline: Date,
+    vacancies: { type: Number, default: 1 },
+    status: { type: String, enum: ['Active', 'Closed', 'Archived'], default: 'Active' },
+    skills: { type: [String], default: [] }
+}, { timestamps: true });
+
+module.exports = mongoose.model('Job', jobSchema);
+Step 8 — Rewrite models/Application.js
+
+const mongoose = require('mongoose');
+
+const applicationSchema = new mongoose.Schema({
+    jobId: { type: mongoose.Schema.Types.ObjectId, ref: 'Job', required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    status: { type: String, enum: ['New', 'Shortlisted', 'Interviewed', 'Rejected', 'Hired'], default: 'New' },
+    coverLetter: String,
+    resumeUrl: String
+}, { timestamps: true });
+
+module.exports = mongoose.model('Application', applicationSchema);
+Step 9 — Rewrite models/index.js
+
+const User = require('./User');
+const Company = require('./Company');
+const Job = require('./Job');
+const Application = require('./Application');
+
+module.exports = { User, Company, Job, Application };
+Step 10 — Rewrite server.js
+
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
+const path = require('path');
+const connectDB = require('./config/database');
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+app.use(morgan('dev'));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/jobs', require('./routes/jobRoutes'));
+app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/companies', require('./routes/companyRoutes'));
+app.use('/api/applications', require('./routes/applicationRoutes'));
+app.use('/api/utils', require('./routes/utilRoutes'));
+
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Internal Server Error',
+        error: process.env.NODE_ENV === 'development' ? err : {},
+    });
+});
+
+const startServer = async () => {
+    try {
+        await connectDB();
+        app.listen(PORT, () => {
+            console.log(`Server is running on port ${PORT}`);
+        });
+    } catch (error) {
+        console.error('Unable to connect to the database:', error);
+        process.exit(1);
+    }
+};
+
+startServer();
+Step 11 — Rewrite middleware/auth.js
+
+const jwt = require('jsonwebtoken');
+const { User, Company } = require('../models');
+
+const protect = async (req, res, next) => {
+    let token;
+
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+            if (decoded.role === 'USER') {
+                req.user = await User.findById(decoded.id).select('-password');
+                if (!req.user) return res.status(401).json({ success: false, message: 'Not authorized, user not found' });
+            } else if (decoded.role === 'COMPANY') {
+                req.company = await Company.findById(decoded.id).select('-password');
+                if (!req.company) return res.status(401).json({ success: false, message: 'Not authorized, company not found' });
+            } else {
+                return res.status(401).json({ success: false, message: 'Not authorized, invalid role' });
+            }
+
+            req.userRole = decoded.role;
+            next();
+        } catch (error) {
+            console.error(error);
+            res.status(401).json({ success: false, message: 'Not authorized, token failed' });
+        }
+    }
+
+    if (!token) {
+        res.status(401).json({ success: false, message: 'Not authorized, no token' });
+    }
+};
+
+const authorize = (...roles) => {
+    return (req, res, next) => {
+        if (!roles.includes(req.userRole)) {
+            return res.status(403).json({ success: false, message: `User role ${req.userRole} is not authorized to access this route` });
+        }
+        next();
+    };
+};
+
+module.exports = { protect, authorize };
+Step 12 — Rewrite controllers/authController.js
+
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { User, Company } = require('../models');
+
+const generateToken = (id, role) => jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+const register = async (req, res) => {
+    const { name, email, password, role, ...otherData } = req.body;
+    try {
+        if (!name || !email || !password || !role) {
+            return res.status(400).json({ success: false, message: 'Please add all required fields' });
+        }
+
+        const userExists = await User.findOne({ email });
+        const companyExists = await Company.findOne({ email });
+        if (userExists || companyExists) {
+            return res.status(400).json({ success: false, message: 'User already exists' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        let data, token;
+
+        if (role === 'USER') {
+            const user = await User.create({ name, email, password: hashedPassword, role: 'USER', ...otherData });
+            data = { id: user._id, name: user.name, email: user.email, role: user.role };
+            token = generateToken(user._id, 'USER');
+        } else if (role === 'COMPANY') {
+            let slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+            let slugExists = await Company.findOne({ slug });
+            let counter = 1;
+            while (slugExists) {
+                const newSlug = `${slug}-${counter}`;
+                slugExists = await Company.findOne({ slug: newSlug });
+                if (!slugExists) slug = newSlug;
+                else counter++;
+            }
+            const company = await Company.create({ name, slug, email, password: hashedPassword, role: 'COMPANY', ...otherData });
+            data = { id: company._id, name: company.name, email: company.email, role: company.role, slug: company.slug };
+            token = generateToken(company._id, 'COMPANY');
+        } else {
+            return res.status(400).json({ success: false, message: 'Invalid role' });
+        }
+
+        res.status(201).json({ success: true, data, token });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+};
+
+const login = async (req, res) => {
+    const { email, password, role } = req.body;
+    try {
+        if (!email || !password || !role) {
+            return res.status(400).json({ success: false, message: 'Please add all fields' });
+        }
+
+        let entity;
+        if (role === 'USER') entity = await User.findOne({ email });
+        else if (role === 'COMPANY') entity = await Company.findOne({ email });
+        else return res.status(400).json({ success: false, message: 'Invalid role' });
+
+        if (entity && (await bcrypt.compare(password, entity.password))) {
+            res.json({
+                success: true,
+                data: { id: entity._id, name: entity.name, email: entity.email, role: entity.role },
+                token: generateToken(entity._id, role)
+            });
+        } else {
+            res.status(400).json({ success: false, message: 'Invalid credentials' });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+};
+
+const getMe = async (req, res) => {
+    try {
+        if (req.userRole === 'USER') {
+            const user = await User.findById(req.user._id).select('-password');
+            res.status(200).json({ success: true, data: user });
+        } else if (req.userRole === 'COMPANY') {
+            const company = await Company.findById(req.company._id).select('-password');
+            res.status(200).json({ success: true, data: company });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+module.exports = { register, login, getMe };
+Step 13 — Rewrite controllers/jobController.js
+
+const { Job, Company, Application } = require('../models');
+
+const createJob = async (req, res) => {
+    try {
+        const { title, type, workMode, location, salaryMin, salaryMax, salaryPeriod, description, requirements, benefits, skills, deadline, vacancies, category, experienceLevel } = req.body;
+
+        let slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+        let slugExists = await Job.findOne({ slug });
+        let counter = 1;
+        while (slugExists) {
+            const newSlug = `${slug}-${counter}`;
+            slugExists = await Job.findOne({ slug: newSlug });
+            if (!slugExists) slug = newSlug;
+            else counter++;
+        }
+
+        const job = await Job.create({
+            companyId: req.company._id,
+            title, slug, type, workMode, location, salaryMin, salaryMax, salaryPeriod,
+            description, requirements, benefits, deadline, skills, vacancies, category, experienceLevel
+        });
+
+        res.status(201).json({ success: true, data: job });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+};
+
+const getJobs = async (req, res) => {
+    try {
+        const { page = 1, limit = 10, search, type, experienceLevel, skills, minSalary, maxSalary, sort } = req.query;
+        const skip = (page - 1) * limit;
+
+        let query = { status: 'Active' };
+
+        if (search) {
+            const regex = new RegExp(search, 'i');
+            query.$or = [
+                { title: regex },
+                { skills: { $elemMatch: { $regex: search, $options: 'i' } } }
+            ];
+        }
+
+        const allowedTypes = ['Full-time', 'Part-time', 'Contract', 'Freelance', 'Internship'];
+        const allowedExperienceLevels = ['Entry', 'Mid', 'Senior', 'Expert', 'Lead'];
+
+        const mapToEnum = (inputStr, allowedList) => {
+            if (!inputStr) return null;
+            const values = inputStr.split(',').map(v => v.trim().toLowerCase());
+            return values.map(v => allowedList.find(a => a.toLowerCase() === v) || v).filter(Boolean);
+        };
+
+        if (type) {
+            const mappedTypes = mapToEnum(type, allowedTypes);
+            if (mappedTypes.length > 0) query.type = { $in: mappedTypes };
+        }
+
+        if (experienceLevel) {
+            const mappedLevels = mapToEnum(experienceLevel, allowedExperienceLevels);
+            if (mappedLevels.length > 0) query.experienceLevel = { $in: mappedLevels };
+        }
+
+        if (skills) {
+            const skillList = skills.split(',').map(s => s.trim());
+            query.skills = { $elemMatch: { $in: skillList.map(s => new RegExp(s, 'i')) } };
+        }
+
+        if (minSalary) query.salaryMin = { $gte: parseInt(minSalary) };
+        if (maxSalary) query.salaryMax = { $lte: parseInt(maxSalary) };
+
+        let sortOption = { createdAt: -1 };
+        if (sort) {
+            const sortLower = sort.toLowerCase();
+            if (sortLower === 'salary_high') sortOption = { salaryMax: -1 };
+            else if (sortLower === 'salary_low') sortOption = { salaryMin: 1 };
+        }
+
+        const count = await Job.countDocuments(query);
+        const jobs = await Job.find(query)
+            .populate('companyId', 'name logoUrl location')
+            .skip(parseInt(skip))
+            .limit(parseInt(limit))
+            .sort(sortOption);
+
+        const jobIds = jobs.map(j => j._id);
+        const appCounts = await Application.aggregate([
+            { $match: { jobId: { $in: jobIds } } },
+            { $group: { _id: '$jobId', count: { $sum: 1 } } }
+        ]);
+        const countMap = {};
+        appCounts.forEach(a => { countMap[a._id.toString()] = a.count; });
+
+        const jobData = jobs.map(job => {
+            const j = job.toObject();
+            j.company = j.companyId;
+            delete j.companyId;
+            j.applicants = countMap[job._id.toString()] || 0;
+            return j;
+        });
+
+        res.status(200).json({
+            success: true,
+            count,
+            totalPages: Math.ceil(count / limit),
+            currentPage: parseInt(page),
+            data: jobData
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+};
+
+const getJobBySlug = async (req, res) => {
+    try {
+        const job = await Job.findOne({ slug: req.params.slug }).populate('companyId', '-password');
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        const applicantCount = await Application.countDocuments({ jobId: job._id });
+        const jobObj = job.toObject();
+        jobObj.company = jobObj.companyId;
+        delete jobObj.companyId;
+        jobObj.applicants = applicantCount;
+
+        res.status(200).json({ success: true, data: jobObj });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const updateJob = async (req, res) => {
+    try {
+        const job = await Job.findById(req.params.id);
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        if (job.companyId.toString() !== req.company._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized to update this job' });
+        }
+
+        const updated = await Job.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        res.status(200).json({ success: true, data: updated });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const deleteJob = async (req, res) => {
+    try {
+        const job = await Job.findById(req.params.id);
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        if (job.companyId.toString() !== req.company._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized to delete this job' });
+        }
+
+        await job.deleteOne();
+        res.status(200).json({ success: true, message: 'Job removed' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const getRecommendedJobs = async (req, res) => {
+    try {
+        const { skills, experienceLevel } = req.user;
+
+        if ((!skills || skills.length === 0) && !experienceLevel) {
+            return res.status(200).json({ success: true, data: [] });
+        }
+
+        const jobs = await Job.find({ status: 'Active' })
+            .populate('companyId', 'name logoUrl location');
+
+        const scoredJobs = jobs.map(job => {
+            let score = 0;
+            const jobSkills = job.skills || [];
+
+            if (skills && skills.length > 0) {
+                const matchCount = skills.filter(skill =>
+                    jobSkills.some(js => js.toLowerCase().includes(skill.toLowerCase()) || skill.toLowerCase().includes(js.toLowerCase()))
+                ).length;
+                score += matchCount * 2;
+            }
+
+            if (experienceLevel && job.experienceLevel === experienceLevel) score += 5;
+            return { job, score };
+        });
+
+        const recommendations = scoredJobs
+            .filter(item => item.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .map(item => item.job);
+
+        res.status(200).json({ success: true, data: recommendations });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const getSimilarJobs = async (req, res) => {
+    try {
+        const currentJob = await Job.findById(req.params.id);
+        if (!currentJob) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        const { category, skills, _id } = currentJob;
+        let orConditions = [];
+
+        if (category) orConditions.push({ category });
+        if (skills && skills.length > 0) {
+            orConditions.push({ skills: { $elemMatch: { $in: skills.map(s => new RegExp(s, 'i')) } } });
+        }
+
+        let query = { status: 'Active', _id: { $ne: _id } };
+        if (orConditions.length > 0) query.$or = orConditions;
+
+        const jobs = await Job.find(query)
+            .populate('companyId', 'name logoUrl location')
+            .limit(5)
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({ success: true, count: jobs.length, data: jobs });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+module.exports = { createJob, getJobs, getJobBySlug, updateJob, deleteJob, getRecommendedJobs, getSimilarJobs };
+Step 14 — Rewrite controllers/userController.js
+
+const { User } = require('../models');
+const fs = require('fs');
+const path = require('path');
+
+const getUserProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).select('-password');
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        res.status(200).json({ success: true, data: user });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const updateUserProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+        const { name, title, bio, city, state, country, zipCode, phone, portfolioUrl, linkedinUrl, githubUrl, skills, experience, education, experienceLevel } = req.body;
+
+        user.name = name || user.name;
+        user.title = title || user.title;
+        user.bio = bio || user.bio;
+        user.city = city || user.city;
+        user.state = state || user.state;
+        user.country = country || user.country;
+        user.zipCode = zipCode || user.zipCode;
+        if (city && country) user.location = `${city}, ${country}`;
+        user.phone = phone || user.phone;
+        user.portfolioUrl = portfolioUrl || user.portfolioUrl;
+        user.linkedinUrl = linkedinUrl || user.linkedinUrl;
+        user.githubUrl = githubUrl || user.githubUrl;
+        user.experienceLevel = experienceLevel || user.experienceLevel;
+
+        if (skills) user.skills = skills;
+        if (experience) {
+            if (Array.isArray(experience)) {
+                const isValid = experience.every(exp =>
+                    exp.title && exp.companyName && exp.employmentType && exp.startDate && exp.location && exp.description
+                );
+                if (!isValid) return res.status(400).json({ success: false, message: 'Experience items must have companyName, employmentType, startDate, location, and description' });
+                user.experience = experience;
+            }
+        }
+        if (education) user.education = education;
+
+        await user.save();
+        user.password = undefined;
+
+        res.status(200).json({ success: true, data: user });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const uploadResume = async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: 'Please upload a file' });
+
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+        user.resumeUrl = `/uploads/resumes/${req.file.filename}`;
+        user.resumeOriginalName = req.file.originalname;
+        user.resumeSize = (req.file.size / 1024 / 1024).toFixed(2) + ' MB';
+        user.resumeUploadDate = Date.now();
+
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            data: {
+                resumeUrl: user.resumeUrl,
+                resumeOriginalName: user.resumeOriginalName,
+                resumeSize: user.resumeSize,
+                resumeUploadDate: user.resumeUploadDate
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const uploadProfilePicture = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: 'Please upload a file' });
+
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+        if (user.profilePictureUrl) {
+            const oldPath = path.join(__dirname, '..', user.profilePictureUrl);
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+
+        user.profilePictureUrl = `/uploads/profiles/${req.file.filename}`;
+        await user.save();
+        user.password = undefined;
+
+        res.status(200).json({ success: true, message: 'Profile picture uploaded successfully', data: user });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const getUserById = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).select('-password');
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        res.status(200).json({ success: true, data: user });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+module.exports = { getUserProfile, updateUserProfile, uploadResume, uploadProfilePicture, getUserById };
+Step 15 — Rewrite controllers/companyController.js
+
+const { Company, Job, Application, User } = require('../models');
+const path = require('path');
+const fs = require('fs');
+
+const getCompanyProfile = async (req, res) => {
+    try {
+        const company = await Company.findById(req.company._id).select('-password');
+        if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+        res.status(200).json({ success: true, data: company });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const getCompanyBySlug = async (req, res) => {
+    try {
+        const company = await Company.findOne({ slug: req.params.slug }).select('-password');
+        if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+
+        const jobs = await Job.find({ companyId: company._id, status: 'Active' });
+
+        const jobIds = jobs.map(j => j._id);
+        const appCounts = await Application.aggregate([
+            { $match: { jobId: { $in: jobIds } } },
+            { $group: { _id: '$jobId', count: { $sum: 1 } } }
+        ]);
+        const countMap = {};
+        appCounts.forEach(a => { countMap[a._id.toString()] = a.count; });
+
+        const jobsData = jobs.map(job => {
+            const j = job.toObject();
+            j.applicants = countMap[job._id.toString()] || 0;
+            return j;
+        });
+
+        const companyData = company.toObject();
+        companyData.jobs = jobsData;
+
+        res.status(200).json({ success: true, data: companyData });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const updateCompanyProfile = async (req, res) => {
+    try {
+        const company = await Company.findById(req.company._id);
+        if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+
+        const { name, industry, description, location, city, state, country, phone, socialLinks, websiteUrl, logoUrl, employeeCount, foundedYear, hrEmail, infoEmail } = req.body;
+
+        company.name = name || company.name;
+        company.industry = industry || company.industry;
+        company.description = description || company.description;
+        company.location = location || company.location;
+        company.city = city || company.city;
+        company.state = state || company.state;
+        company.country = country || company.country;
+        company.phone = phone || company.phone;
+        company.socialLinks = socialLinks || company.socialLinks;
+        company.websiteUrl = websiteUrl || company.websiteUrl;
+        company.logoUrl = logoUrl || company.logoUrl;
+        company.employeeCount = employeeCount || company.employeeCount;
+        company.foundedYear = foundedYear || company.foundedYear;
+        company.hrEmail = hrEmail || company.hrEmail;
+        company.infoEmail = infoEmail || company.infoEmail;
+
+        await company.save();
+        const data = company.toObject();
+        delete data.password;
+
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const getCompanyDashboardStats = async (req, res) => {
+    try {
+        const companyId = req.company._id;
+
+        const totalJobs = await Job.countDocuments({ companyId });
+        const activeJobs = await Job.countDocuments({ companyId, status: 'Active' });
+
+        const jobs = await Job.find({ companyId }, '_id');
+        const jobIds = jobs.map(j => j._id);
+
+        const applications = await Application.find({ jobId: { $in: jobIds } });
+
+        let uniqueApplicantIds = new Set();
+        let pendingReviews = 0;
+        let shortLists = 0;
+
+        applications.forEach(app => {
+            uniqueApplicantIds.add(app.userId.toString());
+            if (['New', 'Pending'].includes(app.status)) pendingReviews++;
+            if (app.status === 'Shortlisted') shortLists++;
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                totalJobs,
+                activeJobs,
+                totalApplicants: uniqueApplicantIds.size,
+                totalApplications: applications.length,
+                pendingReviews,
+                shortLists
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const uploadLogo = async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: 'Please upload a file' });
+
+        const company = await Company.findById(req.company._id);
+        if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+
+        if (company.logoUrl) {
+            const oldPath = path.join(__dirname, '..', company.logoUrl);
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+
+        company.logoUrl = `/uploads/logos/${req.file.filename}`;
+        await company.save();
+
+        const data = company.toObject();
+        delete data.password;
+
+        res.status(200).json({ success: true, message: 'Logo uploaded successfully', data });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const getCompanyOpenPositions = async (req, res) => {
+    try {
+        const company = await Company.findOne({ slug: req.params.slug });
+        if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+
+        const jobs = await Job.find({ companyId: company._id, status: 'Active' })
+            .populate('companyId', 'name logoUrl location slug')
+            .sort({ createdAt: -1 });
+
+        const jobIds = jobs.map(j => j._id);
+        const appCounts = await Application.aggregate([
+            { $match: { jobId: { $in: jobIds } } },
+            { $group: { _id: '$jobId', count: { $sum: 1 } } }
+        ]);
+        const countMap = {};
+        appCounts.forEach(a => { countMap[a._id.toString()] = a.count; });
+
+        const jobsData = jobs.map(job => {
+            const j = job.toObject();
+            j.company = j.companyId;
+            delete j.companyId;
+            j.applicants = countMap[job._id.toString()] || 0;
+            return j;
+        });
+
+        res.status(200).json({ success: true, count: jobs.length, data: jobsData });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const getCompanyJobs = async (req, res) => {
+    try {
+        const { page = 1, limit = 10, search, status, sort } = req.query;
+        const skip = (page - 1) * limit;
+        const query = { companyId: req.company._id };
+
+        const allowedStatuses = ['Active', 'Closed', 'Archived'];
+        if (status !== undefined) {
+            if (!allowedStatuses.includes(status)) {
+                return res.status(400).json({ success: false, message: `Invalid status. Allowed: ${allowedStatuses.join(', ')}` });
+            }
+            query.status = status;
+        }
+
+        if (search) {
+            if (typeof search !== 'string') return res.status(400).json({ success: false, message: 'Invalid search parameter' });
+            query.title = { $regex: search, $options: 'i' };
+        }
+
+        let sortOption = { createdAt: -1 };
+        if (sort) {
+            if (!['newest', 'oldest'].includes(sort)) {
+                return res.status(400).json({ success: false, message: 'Invalid sort parameter. Allowed: newest, oldest' });
+            }
+            if (sort === 'oldest') sortOption = { createdAt: 1 };
+        }
+
+        const count = await Job.countDocuments(query);
+        const jobs = await Job.find(query).skip(parseInt(skip)).limit(parseInt(limit)).sort(sortOption);
+
+        const jobIds = jobs.map(j => j._id);
+        const appCounts = await Application.aggregate([
+            { $match: { jobId: { $in: jobIds } } },
+            { $group: { _id: '$jobId', count: { $sum: 1 } } }
+        ]);
+        const countMap = {};
+        appCounts.forEach(a => { countMap[a._id.toString()] = a.count; });
+
+        const jobsData = jobs.map(job => {
+            const j = job.toObject();
+            j.applicants = countMap[job._id.toString()] || 0;
+            return j;
+        });
+
+        res.status(200).json({
+            success: true,
+            count,
+            totalPages: Math.ceil(count / limit),
+            currentPage: parseInt(page),
+            data: jobsData
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const getCompanyApplicants = async (req, res) => {
+    try {
+        const { page = 1, limit = 10, status, sort, search, experienceLevel, date } = req.query;
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        const jobs = await Job.find({ companyId: req.company._id }, '_id');
+        const jobIds = jobs.map(job => job._id);
+
+        const appQuery = { jobId: { $in: jobIds } };
+
+        if (status) {
+            const statusMap = { 'new': 'New', 'shortlisted': 'Shortlisted', 'interviewed': 'Interviewed', 'rejected': 'Rejected', 'hired': 'Hired' };
+            const validStatuses = status.split(',').map(s => statusMap[s.trim().toLowerCase()]).filter(Boolean);
+            if (validStatuses.length > 0) appQuery.status = { $in: validStatuses };
+        }
+
+        if (date) {
+            const now = new Date();
+            let pastDate = null;
+            const d = date.toLowerCase();
+            if (d === 'last 7 day' || d === 'last 7 days') { pastDate = new Date(); pastDate.setDate(now.getDate() - 7); }
+            else if (d === 'last 30 day' || d === 'last 30 days') { pastDate = new Date(); pastDate.setDate(now.getDate() - 30); }
+            else if (d === '3 month' || d === '3 months') { pastDate = new Date(); pastDate.setMonth(now.getMonth() - 3); }
+            if (pastDate) appQuery.createdAt = { $gte: pastDate };
+        }
+
+        let sortOption = { createdAt: -1 };
+        if (sort === 'oldest') sortOption = { createdAt: 1 };
+
+        const userMatch = {};
+        if (experienceLevel) {
+            const expMap = { 'entry': 'Entry', 'mid': 'Mid', 'senior': 'Senior', 'expert': 'Expert', 'lead': 'Lead' };
+            const validExps = experienceLevel.split(',').map(e => expMap[e.trim().toLowerCase()]).filter(Boolean);
+            if (validExps.length > 0) userMatch.experienceLevel = { $in: validExps };
+        }
+        if (search) userMatch.name = { $regex: search, $options: 'i' };
+
+        const count = await Application.countDocuments(appQuery);
+        let applications = await Application.find(appQuery)
+            .populate({ path: 'userId', select: 'name email experienceLevel profilePictureUrl', match: Object.keys(userMatch).length > 0 ? userMatch : undefined })
+            .populate({ path: 'jobId', select: 'title slug' })
+            .skip(skip)
+            .limit(limitNum)
+            .sort(sortOption);
+
+        if (Object.keys(userMatch).length > 0) {
+            applications = applications.filter(app => app.userId !== null);
+        }
+
+        res.status(200).json({
+            success: true,
+            count,
+            totalPages: Math.ceil(count / limitNum),
+            currentPage: pageNum,
+            data: applications
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+module.exports = { getCompanyProfile, getCompanyBySlug, updateCompanyProfile, getCompanyDashboardStats, uploadLogo, getCompanyOpenPositions, getCompanyJobs, getCompanyApplicants };
+Step 16 — Rewrite controllers/applicationController.js
+
+const { Application, Job, Company } = require('../models');
+
+const applyForJob = async (req, res) => {
+    try {
+        if (!req.body?.coverLetter) return res.status(400).json({ success: false, message: 'Cover letter is required' });
+
+        const { coverLetter } = req.body;
+        const jobId = req.params.jobId;
+        const userId = req.user._id;
+
+        const job = await Job.findById(jobId);
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        const existingApplication = await Application.findOne({ jobId, userId });
+        if (existingApplication) return res.status(400).json({ success: false, message: 'You have already applied for this job' });
+
+        const resumeUrl = req.user.resumeUrl;
+        if (!resumeUrl) return res.status(400).json({ success: false, message: 'Please upload a resume to your profile first' });
+
+        const application = await Application.create({ jobId, userId, coverLetter, resumeUrl, status: 'New' });
+        res.status(201).json({ success: true, data: application });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const getMyApplications = async (req, res) => {
+    try {
+        const { status, date, sort } = req.query;
+        let query = { userId: req.user._id };
+
+        if (status) {
+            const statusList = status.split(',').map(s => s.trim()).filter(Boolean);
+            if (statusList.length > 0) query.status = { $in: statusList };
+        }
+
+        if (date) {
+            const now = new Date();
+            let pastDate = null;
+            if (date === 'last 7 days') { pastDate = new Date(); pastDate.setDate(now.getDate() - 7); }
+            else if (date === 'last 30 days') { pastDate = new Date(); pastDate.setDate(now.getDate() - 30); }
+            else if (date === '3 months') { pastDate = new Date(); pastDate.setMonth(now.getMonth() - 3); }
+            if (pastDate) query.createdAt = { $gte: pastDate };
+        }
+
+        let sortOption = { createdAt: -1 };
+        if (sort === 'Oldest First') sortOption = { createdAt: 1 };
+
+        const applications = await Application.find(query)
+            .populate({ path: 'jobId', populate: { path: 'companyId', select: 'name logoUrl location' } })
+            .sort(sortOption);
+
+        res.status(200).json({ success: true, count: applications.length, data: applications });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+};
+
+const getJobApplicants = async (req, res) => {
+    try {
+        const job = await Job.findById(req.params.jobId);
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        if (job.companyId.toString() !== req.company._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized' });
+        }
+
+        const applicants = await Application.find({ jobId: req.params.jobId })
+            .populate('userId', 'name email title location profilePictureUrl')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({ success: true, data: applicants });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const updateApplicationStatus = async (req, res) => {
+    try {
+        const { status } = req.body;
+        const application = await Application.findById(req.params.id).populate('jobId');
+        if (!application) return res.status(404).json({ success: false, message: 'Application not found' });
+
+        if (application.jobId.companyId.toString() !== req.company._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized' });
+        }
+
+        const allowedStatus = ['New', 'Shortlisted', 'Interviewed', 'Rejected', 'Hired'];
+        if (!allowedStatus.includes(status)) return res.status(400).json({ success: false, message: 'Invalid status' });
+
+        application.status = status;
+        await application.save();
+
+        res.status(200).json({ success: true, data: application });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const withdrawApplication = async (req, res) => {
+    try {
+        const application = await Application.findById(req.params.id);
+        if (!application) return res.status(404).json({ success: false, message: 'Application not found' });
+
+        if (application.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized to withdraw this application' });
+        }
+
+        await application.deleteOne();
+        res.status(200).json({ success: true, message: 'Application withdrawn successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+module.exports = { applyForJob, getMyApplications, getJobApplicants, updateApplicationStatus, withdrawApplication };
+Step 17 — Rewrite controllers/utilController.js
+
+const { Job } = require('../models');
+
+const getSkills = async (req, res) => {
+    try {
+        const jobs = await Job.find({}, 'skills');
+        let allSkills = new Set([
+            'JavaScript', 'Python', 'Java', 'C++', 'Ruby', 'PHP', 'Swift', 'Go',
+            'React', 'Node.js', 'Angular', 'Vue.js', 'Django', 'Flask', 'Spring',
+            'Laravel', 'PostgreSQL', 'MongoDB', 'MySQL', 'AWS', 'Docker', 'Kubernetes'
+        ]);
+
+        jobs.forEach(job => {
+            if (Array.isArray(job.skills)) job.skills.forEach(skill => allSkills.add(skill));
+        });
+
+        res.status(200).json({ success: true, data: Array.from(allSkills).sort() });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const getLocations = async (req, res) => {
+    try {
+        const locations = await Job.distinct('location');
+        locations.sort();
+        res.status(200).json({ success: true, data: locations });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+module.exports = { getSkills, getLocations };
+Step 18 — Start the server
+
+npm run dev
+You should see:
+
+
+MongoDB Connected: cluster0.xxxxx.mongodb.net
+Server is running on port 5000
+Summary of what changed
+Before (Sequelize)	After (Mongoose)
+findByPk(id)	findById(id)
+findOne({ where: {...} })	findOne({...})
+findAll({ where: {...} })	find({...})
+findAndCountAll	find + countDocuments
+instance.destroy()	instance.deleteOne()
+Op.like	$regex
+Op.in	$in
+include: [...] (joins)	.populate(...)
+sequelize.sync()	Not needed — Mongoose auto-creates
+entity.id	entity._id
+
+
+
+
+
+
+
+************************Mongodb keys**************************
+
+prinon96_db_user
+
+uj5JLLqjsRVmBXbJ
+
+using this: 4dTrKMIJ9lAH8zMs
+
+
+mongo uri: mongodb+srv://<db_username>:<db_password>@cluster0.syr4qpz.mongodb.net/?appName=Cluster0
