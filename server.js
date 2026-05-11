@@ -3,7 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const path = require("path");
-const { sequelize } = require("./models");
+const connectDB = require("./config/database")
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -44,12 +44,9 @@ app.use((err, req, res, next) => {
 // Database Connection and Server Start
 const startServer = async () => {
     try {
-        await sequelize.authenticate();
-        console.log("Database connected successfully.");
 
-        // Sync models (force: false to avoid dropping tables)
-        await sequelize.sync({ force: false });
-        console.log("Database synced.");
+        await connectDB()
+        console.log("Database connected successfully.");
 
         app.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);

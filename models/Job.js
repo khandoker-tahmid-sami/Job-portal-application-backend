@@ -1,82 +1,144 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../config/database');
+// const { DataTypes } = require('sequelize');
+// const sequelize = require('../config/database');
 
-const Job = sequelize.define('Job', {
-    id: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
-        primaryKey: true
-    },
+// const Job = sequelize.define('Job', {
+//     id: {
+//         type: DataTypes.UUID,
+//         defaultValue: DataTypes.UUIDV4,
+//         primaryKey: true
+//     },
+//     companyId: {
+//         type: DataTypes.UUID,
+//         allowNull: false
+//     },
+//     title: {
+//         type: DataTypes.STRING,
+//         allowNull: false
+//     },
+//     slug: {
+//         type: DataTypes.STRING,
+//         allowNull: false,
+//         unique: true
+//     },
+//     type: {
+//         type: DataTypes.ENUM('Full-time', 'Part-time', 'Contract', 'Freelance', 'Internship'),
+//         allowNull: false
+//     },
+//     workMode: {
+//         type: DataTypes.ENUM('Remote', 'On-site', 'Hybrid'),
+//         allowNull: false
+//     },
+//     location: {
+//         type: DataTypes.STRING,
+//         allowNull: false
+//     },
+//     salaryMin: {
+//         type: DataTypes.INTEGER
+//     },
+//     salaryMax: {
+//         type: DataTypes.INTEGER
+//     },
+//     salaryPeriod: {
+//         type: DataTypes.ENUM('Hourly', 'Daily', 'Weekly', 'Monthly', 'Yearly'),
+//     },
+//     description: {
+//         type: DataTypes.TEXT,
+//         allowNull: false
+//     },
+//     category: {
+//         type: DataTypes.ENUM('Engineering', 'Design', 'Product', 'Marketing', 'Sales', 'HR', 'Finance', 'Other'),
+//         allowNull: true
+//     },
+//     experienceLevel: {
+//         type: DataTypes.ENUM('Entry', 'Mid', 'Senior', 'Expert', 'Lead'),
+//         allowNull: true
+//     },
+//     requirements: {
+//         type: DataTypes.TEXT
+//     },
+//     benefits: {
+//         type: DataTypes.TEXT
+//     },
+//     deadline: {
+//         type: DataTypes.DATE
+//     },
+//     vacancies: {
+//         type: DataTypes.INTEGER,
+//         defaultValue: 1
+//     },
+
+//     status: {
+//         type: DataTypes.ENUM('Active', 'Closed', 'Archived'),
+//         defaultValue: 'Active'
+//     },
+//     skills: {
+//         type: DataTypes.JSON, // Storing required skills as JSON array
+//         defaultValue: []
+//     }
+// }, {
+//     timestamps: true
+// });
+
+// module.exports = Job;
+
+const mongoose = require("mongoose");
+
+const jobSchema = new mongoose.Schema(
+  {
     companyId: {
-        type: DataTypes.UUID,
-        allowNull: false
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Company",
+      required: true,
     },
-    title: {
-        type: DataTypes.STRING,
-        allowNull: false
-    },
-    slug: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true
-    },
+    title: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
     type: {
-        type: DataTypes.ENUM('Full-time', 'Part-time', 'Contract', 'Freelance', 'Internship'),
-        allowNull: false
+      type: String,
+      enum: ["Full-time", "Part-time", "Contract", "Freelance", "Internship"],
+      required: true,
     },
     workMode: {
-        type: DataTypes.ENUM('Remote', 'On-site', 'Hybrid'),
-        allowNull: false
+      type: String,
+      enum: ["Remote", "On-site", "Hybrid"],
+      required: true,
     },
-    location: {
-        type: DataTypes.STRING,
-        allowNull: false
-    },
-    salaryMin: {
-        type: DataTypes.INTEGER
-    },
-    salaryMax: {
-        type: DataTypes.INTEGER
-    },
+    location: { type: String, required: true },
+    salaryMin: Number,
+    salaryMax: Number,
     salaryPeriod: {
-        type: DataTypes.ENUM('Hourly', 'Daily', 'Weekly', 'Monthly', 'Yearly'),
+      type: String,
+      enum: ["Hourly", "Daily", "Weekly", "Monthly", "Yearly"],
     },
-    description: {
-        type: DataTypes.TEXT,
-        allowNull: false
-    },
+    description: { type: String, required: true },
     category: {
-        type: DataTypes.ENUM('Engineering', 'Design', 'Product', 'Marketing', 'Sales', 'HR', 'Finance', 'Other'),
-        allowNull: true
+      type: String,
+      enum: [
+        "Engineering",
+        "Design",
+        "Product",
+        "Marketing",
+        "Sales",
+        "HR",
+        "Finance",
+        "Other",
+      ],
     },
     experienceLevel: {
-        type: DataTypes.ENUM('Entry', 'Mid', 'Senior', 'Expert', 'Lead'),
-        allowNull: true
+      type: String,
+      enum: ["Entry", "Mid", "Senior", "Expert", "Lead"],
     },
-    requirements: {
-        type: DataTypes.TEXT
-    },
-    benefits: {
-        type: DataTypes.TEXT
-    },
-    deadline: {
-        type: DataTypes.DATE
-    },
-    vacancies: {
-        type: DataTypes.INTEGER,
-        defaultValue: 1
-    },
-
+    requirements: String,
+    benefits: String,
+    deadline: Date,
+    vacancies: { type: Number, default: 1 },
     status: {
-        type: DataTypes.ENUM('Active', 'Closed', 'Archived'),
-        defaultValue: 'Active'
+      type: String,
+      enum: ["Active", "Closed", "Archived"],
+      default: "Active",
     },
-    skills: {
-        type: DataTypes.JSON, // Storing required skills as JSON array
-        defaultValue: []
-    }
-}, {
-    timestamps: true
-});
+    skills: { type: [String], default: [] },
+  },
+  { timestamps: true },
+);
 
-module.exports = Job;
+module.exports = mongoose.model("Job", jobSchema);
