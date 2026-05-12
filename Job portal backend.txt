@@ -1,5 +1,7 @@
 Job Portal Backend Project:
 
+Documentation:https://documenter.getpostman.com/view/9649334/2sB3dQup5e
+
 Job Portal Application Backend — Full Overview
 Language & Runtime
 Language: JavaScript (Node.js)
@@ -1586,7 +1588,7 @@ mongo uri: mongodb+srv://<db_username>:<db_password>@cluster0.syr4qpz.mongodb.ne
 
 
 
-***********************What is slug ******************************************
+***********************What is slug******************************************
 
 What is a Slug?
 A slug is a URL-friendly version of a name — lowercase, spaces replaced with dashes, no special characters.
@@ -1624,3 +1626,163 @@ If two companies have the same name, the counter prevents duplicates:
 tech-corp
 tech-corp-1
 tech-corp-2
+
+
+
+
+
+
+********************************Does the backend saves this JWT token in the database?********************************************
+
+No — and it is NOT necessary for basic JWT authentication.
+
+Here is why:
+
+JWT works on a stateless principle. The token itself contains all the information the server needs:
+
+
+token = header + payload + signature
+The payload inside the token already has:
+
+
+{
+  "id": "683abc...",
+  "role": "USER",
+  "expiresIn": "30 days"
+}
+So when a request comes in, the server just verifies the signature using JWT_SECRET — it does not need to look anything up in the database to validate the token.
+
+
+Frontend sends token → Server checks signature → Valid? → Allow access
+                                                  Invalid? → 401 error
+The flow is:
+
+
+Login → Server creates token → Sends to frontend
+                                      ↓
+                              Frontend stores it (localStorage / cookie)
+                                      ↓
+                              Frontend sends it with every request
+                                      ↓
+                              Server just VERIFIES it — never stores it
+When would you store tokens in DB?
+Only if you need these advanced features:
+
+Feature Why you'd store tokens
+Logout from all devices To invalidate all tokens at once
+Refresh tokens  To issue new access tokens securely
+Ban a user immediately  To blacklist their token before it expires
+For a job portal app at this stage — you do not need it.
+
+
+
+
+**********************************How does the getMe controller working without knowing anything*******************************
+
+The Key: Middleware runs BEFORE the controller
+Look at your route file. Let me check it.
+
+Read d:\Job portal application backend\routes\authRoutes.js
+See line 8:
+
+
+router.get('/me', protect, getMe);
+There are two functions listed: protect then getMe. Express runs them in order — protect runs first, getMe runs second.
+
+Step-by-Step: What Actually Happens
+Step 1 — Frontend sends the token in the header
+
+GET /api/auth/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+No body needed. The token is in the header.
+
+Step 2 — protect middleware runs first
+Look at middleware/auth.js:
+
+
+const protect = async (req, res, next) => {
+
+    // 1. Extract token from header
+    token = req.headers.authorization.split(' ')[1];
+    // "Bearer eyJhbG..." → takes the part after "Bearer "
+
+    // 2. Decode and verify the token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // decoded = { id: "683abc...", role: "USER" }
+
+    // 3. Use the id from token to find the user in MongoDB
+    if (decoded.role === 'USER') {
+        req.user = await User.findById(decoded.id).select('-password');
+    } else if (decoded.role === 'COMPANY') {
+        req.company = await Company.findById(decoded.id).select('-password');
+    }
+
+    req.userRole = decoded.role;
+
+    // 4. Call next() — pass control to getMe
+    next();
+};
+So protect does 4 things:
+
+Pulls the token from the header
+Decodes it to get the id and role
+Fetches the full user/company from MongoDB and attaches it to req
+Calls next() to hand over to the next function (getMe)
+Step 3 — getMe controller runs second
+By the time getMe runs, req.user or req.company is already populated by protect:
+
+
+const getMe = async (req, res) => {
+    if (req.userRole === 'USER') {
+        // req.user was already set by protect middleware
+        const user = await User.findById(req.user._id).select('-password');
+        res.status(200).json({ success: true, data: user });
+
+    } else if (req.userRole === 'COMPANY') {
+        // req.company was already set by protect middleware
+        const company = await Company.findById(req.company._id).select('-password');
+        res.status(200).json({ success: true, data: company });
+    }
+};
+It just reads what protect already put on the req object.
+
+Full Visual Flow
+
+Client sends request
+GET /api/auth/me
+Authorization: Bearer <token>
+        │
+        ▼
+┌─────────────────────────────┐
+│   protect middleware        │
+│                             │
+│  1. Read token from header  │
+│  2. Decode token            │
+│     → id: "683abc..."       │
+│     → role: "USER"          │
+│  3. Find user in MongoDB    │
+│  4. Set req.user = user     │
+│     Set req.userRole = role │
+│  5. Call next()             │
+└─────────────┬───────────────┘
+              │
+              ▼
+┌─────────────────────────────┐
+│   getMe controller          │
+│                             │
+│  req.user is already set ✅  │
+│  req.userRole is set ✅      │
+│                             │
+│  Just return the data       │
+└─────────────────────────────┘
+              │
+              ▼
+Response: { success: true, data: { name, email... } }
+The Key Concept
+req is a shared object that flows through the entire request. Any middleware can add things to it, and the next function can read those things.
+
+protect adds → req.user, req.company, req.userRole
+
+getMe reads → req.user, req.company, req.userRole
+
+That is how getMe knows who is making the request without you passing anything in the body.

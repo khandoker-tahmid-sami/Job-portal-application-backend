@@ -112,6 +112,7 @@ const login = async (req, res) => {
         let entity;
         if (role === 'USER') {
             entity = await User.findOne({ email });
+            console.log(entity)
         } else if (role === 'COMPANY') {
             entity = await Company.findOne({ email });
         } else {
@@ -127,7 +128,7 @@ const login = async (req, res) => {
                     email: entity.email,
                     role: entity.role
                 },
-                token: generateToken(entity.id, role)
+                token: generateToken(entity._id, role)
             });
         } else {
             res.status(400).json({ success: false, message: 'Invalid credentials' });
