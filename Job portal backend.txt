@@ -624,6 +624,8 @@ const authorize = (...roles) => {
 };
 
 module.exports = { protect, authorize };
+
+
 Step 12 — Rewrite controllers/authController.js
 
 const jwt = require('jsonwebtoken');
@@ -721,6 +723,8 @@ const getMe = async (req, res) => {
 };
 
 module.exports = { register, login, getMe };
+
+
 Step 13 — Rewrite controllers/jobController.js
 
 const { Job, Company, Application } = require('../models');
@@ -956,6 +960,8 @@ const getSimilarJobs = async (req, res) => {
 };
 
 module.exports = { createJob, getJobs, getJobBySlug, updateJob, deleteJob, getRecommendedJobs, getSimilarJobs };
+
+
 Step 14 — Rewrite controllers/userController.js
 
 const { User } = require('../models');
@@ -1079,6 +1085,8 @@ const getUserById = async (req, res) => {
 };
 
 module.exports = { getUserProfile, updateUserProfile, uploadResume, uploadProfilePicture, getUserById };
+
+
 Step 15 — Rewrite controllers/companyController.js
 
 const { Company, Job, Application, User } = require('../models');
@@ -1378,6 +1386,7 @@ const getCompanyApplicants = async (req, res) => {
 };
 
 module.exports = { getCompanyProfile, getCompanyBySlug, updateCompanyProfile, getCompanyDashboardStats, uploadLogo, getCompanyOpenPositions, getCompanyJobs, getCompanyApplicants };
+
 Step 16 — Rewrite controllers/applicationController.js
 
 const { Application, Job, Company } = require('../models');
@@ -1574,3 +1583,44 @@ using this: 4dTrKMIJ9lAH8zMs
 
 
 mongo uri: mongodb+srv://<db_username>:<db_password>@cluster0.syr4qpz.mongodb.net/?appName=Cluster0
+
+
+
+***********************What is slug ******************************************
+
+What is a Slug?
+A slug is a URL-friendly version of a name — lowercase, spaces replaced with dashes, no special characters.
+
+Example:
+
+Company Name	Slug
+Tech Corp	tech-corp
+Google Bangladesh	google-bangladesh
+ABC & Sons Ltd!	abc-sons-ltd
+Why is it used?
+
+Instead of using a random ID in the URL like this:
+
+
+/companies/68a3f9c2b1d4e5f6a7b8c9d0
+You get a clean, readable URL like this:
+
+
+/companies/tech-corp
+That's why in your API you have:
+
+
+GET /api/companies/tech-corp        ← uses slug
+GET /api/jobs/frontend-developer    ← jobs also have slugs
+The slug is auto-generated from the name during registration — that's this code in authController.js:
+
+
+let slug = name.toLowerCase()
+               .replace(/[^a-z0-9]+/g, '-')   // replace special chars with -
+               .replace(/(^-|-$)+/g, '');      // remove leading/trailing -
+If two companies have the same name, the counter prevents duplicates:
+
+
+tech-corp
+tech-corp-1
+tech-corp-2

@@ -1,11 +1,11 @@
 const { Application, Job, User, Company } = require('../models');
-const { Op } = require('sequelize');
+// const { Op } = require('sequelize');
 
 // @desc    Apply for a job
 // @route   POST /api/applications/jobs/:jobId/apply
 // @access  Private (User)
 const applyForJob = async (req, res) => {
-    try {
+    /*try {
         if (!req.body?.coverLetter) {
             return res.status(400).json({ success: false, message: 'Cover letter is required' });
         }
@@ -47,6 +47,29 @@ const applyForJob = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+    try {
+        if (!req.body?.coverLetter) return res.status(400).json({ success: false, message: 'Cover letter is required' });
+
+        const { coverLetter } = req.body;
+        const jobId = req.params.jobId;
+        const userId = req.user._id;
+
+        const job = await Job.findById(jobId);
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        const existingApplication = await Application.findOne({ jobId, userId });
+        if (existingApplication) return res.status(400).json({ success: false, message: 'You have already applied for this job' });
+
+        const resumeUrl = req.user.resumeUrl;
+        if (!resumeUrl) return res.status(400).json({ success: false, message: 'Please upload a resume to your profile first' });
+
+        const application = await Application.create({ jobId, userId, coverLetter, resumeUrl, status: 'New' });
+        res.status(201).json({ success: true, data: application });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
 
@@ -57,7 +80,7 @@ const applyForJob = async (req, res) => {
 // @route   GET /api/applications/my-applications
 // @access  Private (User)
 const getMyApplications = async (req, res) => {
-    try {
+    /*try {
         const { status, date, sort } = req.query;
         let where = { userId: req.user.id };
 
@@ -121,6 +144,37 @@ const getMyApplications = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }*/
+
+        try {
+        const { status, date, sort } = req.query;
+        let query = { userId: req.user._id };
+
+        if (status) {
+            const statusList = status.split(',').map(s => s.trim()).filter(Boolean);
+            if (statusList.length > 0) query.status = { $in: statusList };
+        }
+
+        if (date) {
+            const now = new Date();
+            let pastDate = null;
+            if (date === 'last 7 days') { pastDate = new Date(); pastDate.setDate(now.getDate() - 7); }
+            else if (date === 'last 30 days') { pastDate = new Date(); pastDate.setDate(now.getDate() - 30); }
+            else if (date === '3 months') { pastDate = new Date(); pastDate.setMonth(now.getMonth() - 3); }
+            if (pastDate) query.createdAt = { $gte: pastDate };
+        }
+
+        let sortOption = { createdAt: -1 };
+        if (sort === 'Oldest First') sortOption = { createdAt: 1 };
+
+        const applications = await Application.find(query)
+            .populate({ path: 'jobId', populate: { path: 'companyId', select: 'name logoUrl location' } })
+            .sort(sortOption);
+
+        res.status(200).json({ success: true, count: applications.length, data: applications });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
 };
 
@@ -128,7 +182,7 @@ const getMyApplications = async (req, res) => {
 // @route   GET /api/applications/jobs/:jobId/applicants
 // @access  Private (Company)
 const getJobApplicants = async (req, res) => {
-    try {
+    /*try {
         const jobId = req.params.jobId;
 
         // Check if job belongs to company
@@ -157,6 +211,24 @@ const getJobApplicants = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+        try {
+        const job = await Job.findById(req.params.jobId);
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        if (job.companyId.toString() !== req.company._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized' });
+        }
+
+        const applicants = await Application.find({ jobId: req.params.jobId })
+            .populate('userId', 'name email title location profilePictureUrl')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({ success: true, data: applicants });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
 
@@ -164,7 +236,7 @@ const getJobApplicants = async (req, res) => {
 // @route   PATCH /api/applications/:id/status
 // @access  Private (Company)
 const updateApplicationStatus = async (req, res) => {
-    try {
+    /*try {
         const { status } = req.body;
         const applicationId = req.params.id;
 
@@ -193,14 +265,35 @@ const updateApplicationStatus = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
-    }
+    }*/
+
+      try {
+        const { status } = req.body;
+        const application = await Application.findById(req.params.id).populate('jobId');
+        if (!application) return res.status(404).json({ success: false, message: 'Application not found' });
+
+        if (application.jobId.companyId.toString() !== req.company._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized' });
+        }
+
+        const allowedStatus = ['New', 'Shortlisted', 'Interviewed', 'Rejected', 'Hired'];
+        if (!allowedStatus.includes(status)) return res.status(400).json({ success: false, message: 'Invalid status' });
+
+        application.status = status;
+        await application.save();
+
+        res.status(200).json({ success: true, data: application });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }   
 };
 
 // @desc    Withdraw application (Delete)
 // @route   DELETE /api/applications/:id
 // @access  Private (User)
 const withdrawApplication = async (req, res) => {
-    try {
+    /*try {
         const applicationId = req.params.id;
         const userId = req.user.id;
 
@@ -217,6 +310,21 @@ const withdrawApplication = async (req, res) => {
 
         await application.destroy();
 
+        res.status(200).json({ success: true, message: 'Application withdrawn successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+        try {
+        const application = await Application.findById(req.params.id);
+        if (!application) return res.status(404).json({ success: false, message: 'Application not found' });
+
+        if (application.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized to withdraw this application' });
+        }
+
+        await application.deleteOne();
         res.status(200).json({ success: true, message: 'Application withdrawn successfully' });
     } catch (error) {
         console.error(error);

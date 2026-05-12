@@ -1,5 +1,5 @@
 const { Company, Job, Application, User } = require('../models');
-const { Op } = require('sequelize');
+// const { Op } = require('sequelize');
 const path = require('path');
 const fs = require('fs');
 
@@ -7,7 +7,7 @@ const fs = require('fs');
 // @route   GET /api/companies/profile
 // @access  Private (Company)
 const getCompanyProfile = async (req, res) => {
-    try {
+    /*try {
         const company = await Company.findByPk(req.company.id, {
             attributes: { exclude: ['password'] }
         });
@@ -20,6 +20,15 @@ const getCompanyProfile = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+        try {
+        const company = await Company.findById(req.company._id).select('-password');
+        if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+        res.status(200).json({ success: true, data: company });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
 
@@ -27,7 +36,7 @@ const getCompanyProfile = async (req, res) => {
 // @route   GET /api/companies/:slug
 // @access  Public
 const getCompanyBySlug = async (req, res) => {
-    try {
+    /*try {
         const company = await Company.findOne({
             where: { slug: req.params.slug },
             attributes: { exclude: ['password'] },
@@ -61,6 +70,35 @@ const getCompanyBySlug = async (req, res) => {
         }
 
         res.status(200).json({ success: true, data: companyJSON });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+    try {
+        const company = await Company.findOne({ slug: req.params.slug }).select('-password');
+        if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+
+        const jobs = await Job.find({ companyId: company._id, status: 'Active' });
+
+        const jobIds = jobs.map(j => j._id);
+        const appCounts = await Application.aggregate([
+            { $match: { jobId: { $in: jobIds } } },
+            { $group: { _id: '$jobId', count: { $sum: 1 } } }
+        ]);
+        const countMap = {};
+        appCounts.forEach(a => { countMap[a._id.toString()] = a.count; });
+
+        const jobsData = jobs.map(job => {
+            const j = job.toObject();
+            j.applicants = countMap[job._id.toString()] || 0;
+            return j;
+        });
+
+        const companyData = company.toObject();
+        companyData.jobs = jobsData;
+
+        res.status(200).json({ success: true, data: companyData });
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
@@ -128,7 +166,7 @@ const updateCompanyProfile = async (req, res) => {
 // @route   GET /api/companies/dashboard/stats
 // @access  Private (Company)
 const getCompanyDashboardStats = async (req, res) => {
-    try {
+    /*try {
         const companyId = req.company.id;
 
         const totalJobs = await Job.count({ where: { companyId } });
@@ -179,14 +217,52 @@ const getCompanyDashboardStats = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+    try {
+        const companyId = req.company._id;
+
+        const totalJobs = await Job.countDocuments({ companyId });
+        const activeJobs = await Job.countDocuments({ companyId, status: 'Active' });
+
+        const jobs = await Job.find({ companyId }, '_id');
+        const jobIds = jobs.map(j => j._id);
+
+        const applications = await Application.find({ jobId: { $in: jobIds } });
+
+        let uniqueApplicantIds = new Set();
+        let pendingReviews = 0;
+        let shortLists = 0;
+
+        applications.forEach(app => {
+            uniqueApplicantIds.add(app.userId.toString());
+            if (['New', 'Pending'].includes(app.status)) pendingReviews++;
+            if (app.status === 'Shortlisted') shortLists++;
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                totalJobs,
+                activeJobs,
+                totalApplicants: uniqueApplicantIds.size,
+                totalApplications: applications.length,
+                pendingReviews,
+                shortLists
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
+
 };
 
 // @desc    Upload company logo
 // @route   POST /api/companies/logo
 // @access  Private (Company only)
 const uploadLogo = async (req, res, next) => {
-    try {
+    /*try {
         if (!req.file) {
             return res.status(400).json({ success: false, message: 'Please upload a file' });
         }
@@ -218,6 +294,28 @@ const uploadLogo = async (req, res, next) => {
         });
     } catch (error) {
         next(error);
+    }*/
+
+    try {
+        if (!req.file) return res.status(400).json({ success: false, message: 'Please upload a file' });
+
+        const company = await Company.findById(req.company._id);
+        if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+
+        if (company.logoUrl) {
+            const oldPath = path.join(__dirname, '..', company.logoUrl);
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+
+        company.logoUrl = `/uploads/logos/${req.file.filename}`;
+        await company.save();
+
+        const data = company.toObject();
+        delete data.password;
+
+        res.status(200).json({ success: true, message: 'Logo uploaded successfully', data });
+    } catch (error) {
+        next(error);
     }
 };
 
@@ -225,7 +323,7 @@ const uploadLogo = async (req, res, next) => {
 // @route   GET /api/companies/:slug/jobs
 // @access  Public
 const getCompanyOpenPositions = async (req, res) => {
-    try {
+    /*try {
         const company = await Company.findOne({
             where: { slug: req.params.slug }
         });
@@ -258,6 +356,36 @@ const getCompanyOpenPositions = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+        try {
+        const company = await Company.findOne({ slug: req.params.slug });
+        if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+
+        const jobs = await Job.find({ companyId: company._id, status: 'Active' })
+            .populate('companyId', 'name logoUrl location slug')
+            .sort({ createdAt: -1 });
+
+        const jobIds = jobs.map(j => j._id);
+        const appCounts = await Application.aggregate([
+            { $match: { jobId: { $in: jobIds } } },
+            { $group: { _id: '$jobId', count: { $sum: 1 } } }
+        ]);
+        const countMap = {};
+        appCounts.forEach(a => { countMap[a._id.toString()] = a.count; });
+
+        const jobsData = jobs.map(job => {
+            const j = job.toObject();
+            j.company = j.companyId;
+            delete j.companyId;
+            j.applicants = countMap[job._id.toString()] || 0;
+            return j;
+        });
+
+        res.status(200).json({ success: true, count: jobs.length, data: jobsData });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
 
@@ -265,7 +393,7 @@ const getCompanyOpenPositions = async (req, res) => {
 // @route   GET /api/companies/jobs
 // @access  Private (Company)
 const getCompanyJobs = async (req, res) => {
-    try {
+    /*try {
         const { page = 1, limit = 10, search, status, sort } = req.query;
         const offset = (page - 1) * limit;
 
@@ -334,6 +462,61 @@ const getCompanyJobs = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+    try {
+        const { page = 1, limit = 10, search, status, sort } = req.query;
+        const skip = (page - 1) * limit;
+        const query = { companyId: req.company._id };
+
+        const allowedStatuses = ['Active', 'Closed', 'Archived'];
+        if (status !== undefined) {
+            if (!allowedStatuses.includes(status)) {
+                return res.status(400).json({ success: false, message: `Invalid status. Allowed: ${allowedStatuses.join(', ')}` });
+            }
+            query.status = status;
+        }
+
+        if (search) {
+            if (typeof search !== 'string') return res.status(400).json({ success: false, message: 'Invalid search parameter' });
+            query.title = { $regex: search, $options: 'i' };
+        }
+
+        let sortOption = { createdAt: -1 };
+        if (sort) {
+            if (!['newest', 'oldest'].includes(sort)) {
+                return res.status(400).json({ success: false, message: 'Invalid sort parameter. Allowed: newest, oldest' });
+            }
+            if (sort === 'oldest') sortOption = { createdAt: 1 };
+        }
+
+        const count = await Job.countDocuments(query);
+        const jobs = await Job.find(query).skip(parseInt(skip)).limit(parseInt(limit)).sort(sortOption);
+
+        const jobIds = jobs.map(j => j._id);
+        const appCounts = await Application.aggregate([
+            { $match: { jobId: { $in: jobIds } } },
+            { $group: { _id: '$jobId', count: { $sum: 1 } } }
+        ]);
+        const countMap = {};
+        appCounts.forEach(a => { countMap[a._id.toString()] = a.count; });
+
+        const jobsData = jobs.map(job => {
+            const j = job.toObject();
+            j.applicants = countMap[job._id.toString()] || 0;
+            return j;
+        });
+
+        res.status(200).json({
+            success: true,
+            count,
+            totalPages: Math.ceil(count / limit),
+            currentPage: parseInt(page),
+            data: jobsData
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
 
@@ -344,7 +527,7 @@ const getCompanyJobs = async (req, res) => {
 // @route   GET /api/companies/applicants
 // @access  Private (Company)
 const getCompanyApplicants = async (req, res) => {
-    try {
+    /*try {
         const { page = 1, limit = 10, status, sort, search, experienceLevel, date } = req.query;
         // Basic pagination
         const pageNum = parseInt(page);
@@ -466,6 +649,68 @@ const getCompanyApplicants = async (req, res) => {
             data: rows
         });
 
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+    try {
+        const { page = 1, limit = 10, status, sort, search, experienceLevel, date } = req.query;
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        const jobs = await Job.find({ companyId: req.company._id }, '_id');
+        const jobIds = jobs.map(job => job._id);
+
+        const appQuery = { jobId: { $in: jobIds } };
+
+        if (status) {
+            const statusMap = { 'new': 'New', 'shortlisted': 'Shortlisted', 'interviewed': 'Interviewed', 'rejected': 'Rejected', 'hired': 'Hired' };
+            const validStatuses = status.split(',').map(s => statusMap[s.trim().toLowerCase()]).filter(Boolean);
+            if (validStatuses.length > 0) appQuery.status = { $in: validStatuses };
+        }
+
+        if (date) {
+            const now = new Date();
+            let pastDate = null;
+            const d = date.toLowerCase();
+            if (d === 'last 7 day' || d === 'last 7 days') { pastDate = new Date(); pastDate.setDate(now.getDate() - 7); }
+            else if (d === 'last 30 day' || d === 'last 30 days') { pastDate = new Date(); pastDate.setDate(now.getDate() - 30); }
+            else if (d === '3 month' || d === '3 months') { pastDate = new Date(); pastDate.setMonth(now.getMonth() - 3); }
+            if (pastDate) appQuery.createdAt = { $gte: pastDate };
+        }
+
+        let sortOption = { createdAt: -1 };
+        if (sort === 'oldest') sortOption = { createdAt: 1 };
+
+        const userMatch = {};
+        if (experienceLevel) {
+            const expMap = { 'entry': 'Entry', 'mid': 'Mid', 'senior': 'Senior', 'expert': 'Expert', 'lead': 'Lead' };
+            const validExps = experienceLevel.split(',').map(e => expMap[e.trim().toLowerCase()]).filter(Boolean);
+            if (validExps.length > 0) userMatch.experienceLevel = { $in: validExps };
+        }
+        if (search) userMatch.name = { $regex: search, $options: 'i' };
+
+        const count = await Application.countDocuments(appQuery);
+        let applications = await Application.find(appQuery)
+            .populate({ path: 'userId', select: 'name email experienceLevel profilePictureUrl', match: Object.keys(userMatch).length > 0 ? userMatch : undefined })
+            .populate({ path: 'jobId', select: 'title slug' })
+            .skip(skip)
+            .limit(limitNum)
+            .sort(sortOption);
+
+        if (Object.keys(userMatch).length > 0) {
+            applications = applications.filter(app => app.userId !== null);
+        }
+
+        res.status(200).json({
+            success: true,
+            count,
+            totalPages: Math.ceil(count / limitNum),
+            currentPage: pageNum,
+            data: applications
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });

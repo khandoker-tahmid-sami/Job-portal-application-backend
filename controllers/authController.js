@@ -22,8 +22,8 @@ const register = async (req, res) => {
         }
 
         // Check if user/company exists
-        const userExists = await User.findOne({ where: { email } });
-        const companyExists = await Company.findOne({ where: { email } });
+        const userExists = await User.findOne({ email });
+        const companyExists = await Company.findOne({  email });
 
         if (userExists || companyExists) {
             return res.status(400).json({ success: false, message: 'User already exists' });
@@ -45,20 +45,20 @@ const register = async (req, res) => {
                 ...otherData
             });
             data = {
-                id: user.id,
+                id: user._id,
                 name: user.name,
                 email: user.email,
                 role: user.role
             };
-            token = generateToken(user.id, 'USER');
+            token = generateToken(user._id, 'USER');
         } else if (role === 'COMPANY') {
             // Generate slug
             let slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-            let slugExists = await Company.findOne({ where: { slug } });
+            let slugExists = await Company.findOne({ slug });
             let counter = 1;
             while (slugExists) {
                 const newSlug = `${slug}-${counter}`;
-                slugExists = await Company.findOne({ where: { slug: newSlug } });
+                slugExists = await Company.findOne({ slug: newSlug});
                 if (!slugExists) {
                     slug = newSlug;
                 } else {
@@ -75,13 +75,13 @@ const register = async (req, res) => {
                 ...otherData
             });
             data = {
-                id: company.id,
+                id: company._id,
                 name: company.name,
                 email: company.email,
                 role: company.role,
                 slug: company.slug
             };
-            token = generateToken(company.id, 'COMPANY');
+            token = generateToken(company._id, 'COMPANY');
         } else {
             return res.status(400).json({ success: false, message: 'Invalid role' });
         }
@@ -111,9 +111,9 @@ const login = async (req, res) => {
 
         let entity;
         if (role === 'USER') {
-            entity = await User.findOne({ where: { email } });
+            entity = await User.findOne({ email });
         } else if (role === 'COMPANY') {
-            entity = await Company.findOne({ where: { email } });
+            entity = await Company.findOne({ email });
         } else {
             return res.status(400).json({ success: false, message: 'Invalid role' });
         }
@@ -122,7 +122,7 @@ const login = async (req, res) => {
             res.json({
                 success: true,
                 data: {
-                    id: entity.id,
+                    id: entity._id,
                     name: entity.name,
                     email: entity.email,
                     role: entity.role
@@ -145,14 +145,15 @@ const login = async (req, res) => {
 const getMe = async (req, res) => {
     try {
         if (req.userRole === 'USER') {
-            const user = await User.findByPk(req.user.id, {
+        const user = await User.findById(req.user._id).select('-password');
+
+           /* const user = await User.findByPk(req.user.id, {
                 attributes: { exclude: ['password'] }
-            });
+            }); */
+
             res.status(200).json({ success: true, data: user });
         } else if (req.userRole === 'COMPANY') {
-            const company = await Company.findByPk(req.company.id, {
-                attributes: { exclude: ['password'] }
-            });
+            const company = await Company.findById(req.company._id).select('-password');
             res.status(200).json({ success: true, data: company });
         }
     } catch (error) {

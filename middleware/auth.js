@@ -14,12 +14,12 @@ const protect = async (req, res, next) => {
 
             // Get user or company from the token
             if (decoded.role === 'USER') {
-                req.user = await User.findByPk(decoded.id);
+                req.user = await User.findById(decoded.id);
                 if (!req.user) {
                     return res.status(401).json({ success: false, message: 'Not authorized, user not found' });
                 }
             } else if (decoded.role === 'COMPANY') {
-                req.company = await Company.findByPk(decoded.id);
+                req.company = await Company.findById(decoded.id);
                 if (!req.company) {
                     return res.status(401).json({ success: false, message: 'Not authorized, company not found' });
                 }

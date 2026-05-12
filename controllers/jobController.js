@@ -1,5 +1,5 @@
 const { Job, Company, Application } = require('../models');
-const { Op, Sequelize } = require('sequelize');
+// const { Op, Sequelize } = require('sequelize');
 
 // @desc    Create a new job
 // @route   POST /api/jobs
@@ -10,11 +10,11 @@ const createJob = async (req, res) => {
 
         // Generate slug
         let slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-        let slugExists = await Job.findOne({ where: { slug } });
+        let slugExists = await Job.findOne({ slug });
         let counter = 1;
         while (slugExists) {
             const newSlug = `${slug}-${counter}`;
-            slugExists = await Job.findOne({ where: { slug: newSlug } });
+            slugExists = await Job.findOne({  slug: newSlug });
             if (!slugExists) {
                 slug = newSlug;
             } else {
@@ -23,7 +23,7 @@ const createJob = async (req, res) => {
         }
 
         const job = await Job.create({
-            companyId: req.company.id,
+            companyId: req.company._id,
             title,
             slug,
             type,
@@ -57,20 +57,27 @@ const getJobs = async (req, res) => {
         const { page = 1, limit = 10, search, type, experienceLevel, skills, minSalary, maxSalary, sort } = req.query;
         const offset = (page - 1) * limit;
 
-        let where = { status: 'Active' };
+        let query = { status: 'Active' };
 
         // 1. Search (Title and Skills) - Case Insensitive
-        if (search) {
-            const searchTerm = `%${search.toLowerCase()}%`;
-            where[Op.or] = [
-                { title: { [Op.like]: searchTerm } },
-                // Cast JSON skills to TEXT for LIKE search
-                Sequelize.where(
-                    Sequelize.cast(Sequelize.col('Job.skills'), 'TEXT'),
-                    { [Op.like]: searchTerm }
-                )
+         if (search) {
+            const regex = new RegExp(search, 'i');
+            query.$or = [
+                { title: regex },
+                { skills: { $elemMatch: { $regex: search, $options: 'i' } } }
             ];
         }
+        // if (search) {
+        //     const searchTerm = `%${search.toLowerCase()}%`;
+        //     where[Op.or] = [
+        //         { title: { [Op.like]: searchTerm } },
+        //         // Cast JSON skills to TEXT for LIKE search
+        //         Sequelize.where(
+        //             Sequelize.cast(Sequelize.col('Job.skills'), 'TEXT'),
+        //             { [Op.like]: searchTerm }
+        //         )
+        //     ];
+        // }
 
         // Lists for Case-Insensitive Mapping
         const allowedTypes = ['Full-time', 'Part-time', 'Contract', 'Freelance', 'Internship'];
@@ -88,7 +95,7 @@ const getJobs = async (req, res) => {
         if (type) {
             const mappedTypes = mapToEnum(type, allowedTypes);
             if (mappedTypes.length > 0) {
-                where.type = { [Op.in]: mappedTypes };
+                query.type = { $in: mappedTypes }
             }
         }
 
@@ -96,7 +103,7 @@ const getJobs = async (req, res) => {
         if (experienceLevel) {
             const mappedLevels = mapToEnum(experienceLevel, allowedExperienceLevels);
             if (mappedLevels.length > 0) {
-                where.experienceLevel = { [Op.in]: mappedLevels };
+                query.experienceLevel = { $in: mappedLevels }
             }
         }
 
@@ -104,21 +111,23 @@ const getJobs = async (req, res) => {
         if (skills) {
             const skillList = skills.split(',').map(s => s.trim());
             // Since skills is JSON, we use LIKE for text matching on the casted JSON string
-            const skillConditions = skillList.map(s =>
-                Sequelize.where(
-                    Sequelize.cast(Sequelize.col('Job.skills'), 'TEXT'),
-                    { [Op.like]: `%${s}%` }
-                )
-            );
+            // const skillConditions = skillList.map(s =>
+            //     Sequelize.where(
+            //         Sequelize.cast(Sequelize.col('Job.skills'), 'TEXT'),
+            //         { [Op.like]: `%${s}%` }
+            //     )
+            // );
+
+            query.skills = { $elemMatch: { $in: skillList.map(s => new RegExp(s, 'i')) } };
 
             // Add to AND conditions (Job must match existing 'where' AND (skill1 OR skill2 ...))
-            where[Op.and] = where[Op.and] || [];
-            where[Op.and].push({ [Op.or]: skillConditions });
+            // where[Op.and] = where[Op.and] || [];
+            // where[Op.and].push({ [Op.or]: skillConditions });
         }
 
         // Salary Range
         if (minSalary) {
-            where.salaryMin = { [Op.gte]: parseInt(minSalary) };
+             query.salaryMin = { $gte: parseInt(minSalary) }
         }
         if (maxSalary) {
             // Job's max salary should be ideally higher than requested max?
@@ -140,13 +149,14 @@ const getJobs = async (req, res) => {
 
             // User Spec: "Salary Range should be between salaryMin and salaryMax"
             // I will assume strict containment for now, or lower bound.
-            where.salaryMax = { [Op.lte]: parseInt(maxSalary) };
+            query.salaryMax = { $lte: parseInt(maxSalary) };
         }
 
         // 3. Sorting
-        let order = [['createdAt', 'DESC']]; // Recent (Default)
+        // let order = [['createdAt', 'DESC']]; // Recent (Default)
+        let sortOption = { createdAt: -1 };
 
-        if (sort) {
+        /*if (sort) {
             const sortLower = sort.toLowerCase();
             if (sortLower === 'salary_high') {
                 order = [['salaryMax', 'DESC']]; // High to Low
@@ -154,10 +164,16 @@ const getJobs = async (req, res) => {
                 order = [['salaryMin', 'ASC']]; // Low to High
             }
             // 'recent' is default fall-through
+        }*/
+
+         if (sort) {
+            const sortLower = sort.toLowerCase();
+            if (sortLower === 'salary_high') sortOption = { salaryMax: -1 };
+            else if (sortLower === 'salary_low') sortOption = { salaryMin: 1 };
         }
 
-        console.log(where)
-        const { count, rows } = await Job.findAndCountAll({
+        // console.log(where)
+       /*const { count, rows } = await Job.findAndCountAll({
             where,
             include: [
                 {
@@ -175,14 +191,39 @@ const getJobs = async (req, res) => {
             offset: parseInt(offset),
             order,
             distinct: true // Important for correct count with includes
-        });
+        });*/
+
+        const count = await Job.countDocuments(query);
+        const jobs = await Job.find(query)
+            .populate('companyId', 'name logoUrl location')
+            .skip(parseInt(skip))
+            .limit(parseInt(limit))
+            .sort(sortOption);
+
+        const jobIds = jobs.map(j => j._id);
+        const appCounts = await Application.aggregate([
+            { $match: { jobId: { $in: jobIds } } },
+            { $group: { _id: '$jobId', count: { $sum: 1 } } }
+        ]);
+        const countMap = {};
+        appCounts.forEach(a => { countMap[a._id.toString()] = a.count; });
+
+        
 
         // Add applicants count to each job
-        const jobData = rows.map(job => {
+        /*const jobData = rows.map(job => {
             const jobJSON = job.toJSON();
             jobJSON.applicants = job.applications ? job.applications.length : 0;
             delete jobJSON.applications; // Clean up response
             return jobJSON;
+        });*/
+
+        const jobData = jobs.map(job => {
+            const j = job.toObject();
+            j.company = j.companyId;
+            delete j.companyId;
+            j.applicants = countMap[job._id.toString()] || 0;
+            return j;
         });
 
         res.status(200).json({
@@ -203,7 +244,7 @@ const getJobs = async (req, res) => {
 // @route   GET /api/jobs/:slug
 // @access  Public
 const getJobBySlug = async (req, res) => {
-    try {
+    /*try {
         const job = await Job.findOne({
             where: { slug: req.params.slug },
             include: [
@@ -232,6 +273,22 @@ const getJobBySlug = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+    try {
+        const job = await Job.findOne({ slug: req.params.slug }).populate('companyId', '-password');
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        const applicantCount = await Application.countDocuments({ jobId: job._id });
+        const jobObj = job.toObject();
+        jobObj.company = jobObj.companyId;
+        delete jobObj.companyId;
+        jobObj.applicants = applicantCount;
+
+        res.status(200).json({ success: true, data: jobObj });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
 
@@ -239,7 +296,7 @@ const getJobBySlug = async (req, res) => {
 // @route   PUT /api/jobs/:id
 // @access  Private (Company)
 const updateJob = async (req, res) => {
-    try {
+    /*try {
         let job = await Job.findByPk(req.params.id);
 
         if (!job) {
@@ -257,6 +314,21 @@ const updateJob = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+    try {
+        const job = await Job.findById(req.params.id);
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        if (job.companyId.toString() !== req.company._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized to update this job' });
+        }
+
+        const updated = await Job.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        res.status(200).json({ success: true, data: updated });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
 
@@ -264,7 +336,7 @@ const updateJob = async (req, res) => {
 // @route   DELETE /api/jobs/:id
 // @access  Private (Company)
 const deleteJob = async (req, res) => {
-    try {
+    /*try {
         const job = await Job.findByPk(req.params.id);
 
         if (!job) {
@@ -282,6 +354,21 @@ const deleteJob = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+    try {
+        const job = await Job.findById(req.params.id);
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        if (job.companyId.toString() !== req.company._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized to delete this job' });
+        }
+
+        await job.deleteOne();
+        res.status(200).json({ success: true, message: 'Job removed' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
 
@@ -289,7 +376,7 @@ const deleteJob = async (req, res) => {
 // @route   GET /api/jobs/recommendations
 // @access  Private (User)
 const getRecommendedJobs = async (req, res) => {
-    try {
+    /*try {
         const { skills, experienceLevel } = req.user;
 
         // If no skills or experience level, return allowed generic jobs or empty
@@ -343,6 +430,42 @@ const getRecommendedJobs = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+    try {
+        const { skills, experienceLevel } = req.user;
+
+        if ((!skills || skills.length === 0) && !experienceLevel) {
+            return res.status(200).json({ success: true, data: [] });
+        }
+
+        const jobs = await Job.find({ status: 'Active' })
+            .populate('companyId', 'name logoUrl location');
+
+        const scoredJobs = jobs.map(job => {
+            let score = 0;
+            const jobSkills = job.skills || [];
+
+            if (skills && skills.length > 0) {
+                const matchCount = skills.filter(skill =>
+                    jobSkills.some(js => js.toLowerCase().includes(skill.toLowerCase()) || skill.toLowerCase().includes(js.toLowerCase()))
+                ).length;
+                score += matchCount * 2;
+            }
+
+            if (experienceLevel && job.experienceLevel === experienceLevel) score += 5;
+            return { job, score };
+        });
+
+        const recommendations = scoredJobs
+            .filter(item => item.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .map(item => item.job);
+
+        res.status(200).json({ success: true, data: recommendations });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
 
@@ -350,7 +473,7 @@ const getRecommendedJobs = async (req, res) => {
 // @route   GET /api/jobs/:id/similar
 // @access  Public
 const getSimilarJobs = async (req, res) => {
-    try {
+    /*try {
         const jobId = req.params.id;
         const currentJob = await Job.findByPk(jobId);
 
@@ -394,6 +517,32 @@ const getSimilarJobs = async (req, res) => {
 
         res.status(200).json({ success: true, count: jobs.length, data: jobs });
 
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }*/
+
+    try {
+        const currentJob = await Job.findById(req.params.id);
+        if (!currentJob) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        const { category, skills, _id } = currentJob;
+        let orConditions = [];
+
+        if (category) orConditions.push({ category });
+        if (skills && skills.length > 0) {
+            orConditions.push({ skills: { $elemMatch: { $in: skills.map(s => new RegExp(s, 'i')) } } });
+        }
+
+        let query = { status: 'Active', _id: { $ne: _id } };
+        if (orConditions.length > 0) query.$or = orConditions;
+
+        const jobs = await Job.find(query)
+            .populate('companyId', 'name logoUrl location')
+            .limit(5)
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({ success: true, count: jobs.length, data: jobs });
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
